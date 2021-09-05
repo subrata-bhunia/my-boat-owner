@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
     Text,
     View,
@@ -9,14 +9,165 @@ import {
 } from 'react-native';
 import { 
     Icon,
-    Input
+    Input,
+    Overlay
 } from 'react-native-elements';
 import { back_img, Colors, FontFamily, Sizes } from '../../Constants/Constants';
 import { useNavigation } from '@react-navigation/core';
+import axios from 'axios';
+import config from '../../Constants/config';
+import { Picker } from '@react-native-picker/picker';
+import DatePicker from 'react-native-datepicker';
+import OtpInputs from 'react-native-otp-inputs';
 
-
+/*
+email, 
+login_type (0 for App, 1 for Facebook, 2 for Google, 3 for twitter, 4 for Instagram, 5 for apple), 
+user_type_post (0=admin, 1=user, 2=Client), 
+device_type (browser, Android, IOS), 
+f_name , 
+l_name, 
+user_name, 
+business_name , 
+dob, 
+city ( check city_master table for codes for each city), 
+language_id (0=English, 1=Arabic), 
+country_code (for mobile number), 
+phone_number, 
+password, 
+gender (0 for none, 1 for male, 2 for female), 
+player_id
+*/
 const SignUp=()=>{
     const Navigation = useNavigation();
+    const [cityArr,serCityArr]=useState([])
+    // -------------------------------------------- //
+    const [f_name,setF_name]=useState("");
+    const [L_name,setL_name]=useState("");
+    const [email,setemail]=useState("");
+    const [m_number,setm_number]=useState("");
+    const [b_name,setb_name]=useState("");
+    const [b_location,setb_location]=useState("");
+    const [dob,setdob]=useState("");
+    const [city,setcity]=useState("Choose City");
+    const [gender,setgender]=useState("");
+    const [password,setpassword]=useState("");
+    const [confirmPass,setconfirmPass]=useState("");
+    // 
+    const [userId,setUserId]=useState(null)
+    // 
+    const [visible, setVisible] = useState(false);
+    const [otp,setOtp] = useState("")
+    const toggleOverlay = () => {
+      setVisible(!visible);
+    };
+    // ----------- //
+    const [AllData,setAllData]=useState(null);
+    // 
+    var raw= {
+        f_name:f_name,
+        l_name:L_name,
+        business_name:b_name,
+        country_code:config.country_code,
+        language_id:config.language_id,
+        login_type:config.login_type,
+        device_type:config.device_type,
+        dob:dob,
+        city:city,
+        phone_number:m_number,
+        password:password,
+        gender:gender === "" ? 0 : gender === "male" ? 1 : 2,
+        player_id:config.player_id,
+        user_type_post:config.user_type_post
+    }
+
+    // console.log(signup_data);
+
+    // -----------------------Api Urls--------------------- //
+    var url='https://myboatonline.com/app/webservice';
+    const apiUrl_signup = url+"/signup.php";
+    const cityUrl = config.apiUrl+"/city_list.php?country_code=965"
+    const mailSendUrl =config.apiUrl+"/mailFunctionsSend.php";
+    const resendOtpUrl= config.apiUrl+"/resend_otp.php";
+    // ----------All Citys ----------- //
+    const ApiTest=()=>{
+        axios.get(cityUrl)
+        .then((res)=>serCityArr(res.data.city_arr))
+        .catch((err)=>console.log(err))
+    }
+
+    // --------------Sign Up ----------- //
+    var signup_data = new FormData ();
+    signup_data.append('f_name',f_name);
+    signup_data.append('l_name',L_name);
+    signup_data.append('email',email);
+    signup_data.append('business_name',b_name);
+    signup_data.append('country_code',config.country_code);
+    signup_data.append('language_id',config.language_id);
+    signup_data.append('login_type',config.login_type);
+    signup_data.append('device_type',config.device_type);
+    signup_data.append('dob',dob);
+    signup_data.append('city',city);
+    signup_data.append('phone_number',m_number);
+    signup_data.append('password',password);
+    signup_data.append('gender',gender === "" ? 0 : gender === "male" ? 1 : 2);
+    signup_data.append('player_id',config.player_id);
+    signup_data.append('user_type_post',config.user_type_post);
+    // ------------------------------------//
+    const signUp =()=>{
+        if(password !== confirmPass){
+            alert("Password not matched .")
+        }else{
+        axios.post(apiUrl_signup,signup_data)
+        .then((res)=>{setAllData(res.data),res.data.success === "true" ? (toggleOverlay()) : alert(res.data.msg[0])})
+        .catch((err)=>console.log("sign_up_error",err))
+        }
+    }
+    // ----------- Mail sent ---------- //
+    var email_array=AllData === null ? null : AllData.email_arr ;
+    // console.log("email_array===>",email_array.length)
+    useEffect(()=>{
+       
+        if (AllData !== null){
+            if (AllData.success === 'true'){
+                setUserId(AllData.user_id)
+                mailSend()
+                
+            }
+        }
+    },[AllData])
+    console.log(userId)
+    const mailSend=()=>{
+        var email = email_array[0].email;
+        var mailcontent = email_array[0].mailcontent
+        var mailsubject = email_array[0].mailsubject
+        var fromName = email_array[0].fromName
+        var mailData = new FormData();
+        mailData.append("email", email);
+        mailData.append("mailcontent", mailcontent);
+        mailData.append("mailsubject", mailsubject);
+        mailData.append("fromName", fromName);
+        mailData.append("mail_file", 'NA');
+        // console.log('mailData==', mailData);
+        axios.post(mailSendUrl,mailData)
+        .then((res)=>console.log(res.data))
+        .catch((err)=>console.log(err))
+    }
+    // ---------- Resend Otp ------ //
+    const resendOtp=({user_id})=>{
+        var resend_otp_data = new FormData();
+        resend_otp_data.append("user_id_post",user_id);
+        axios.post(resendOtpUrl,resend_otp_data)
+        .then((res)=>console.log(res))
+        .catch((err)=>console.log(err))
+    }
+    //
+    useEffect(()=>{
+        ApiTest()
+    },[])
+    
+    // console.log(AllData);
+    // cityArr.map((val,ind)=>console.log(val.city[0]))
     return(
         <View>
             <ImageBackground
@@ -39,6 +190,8 @@ const SignUp=()=>{
                                 inputContainerStyle={s.Input1}
                                 placeholderTextColor={Colors.white}
                                 inputStyle={{color:Colors.white}}
+                                onChangeText={(t)=>setF_name(t)}
+                                value={f_name}
                                 />
                             <Input
                                 placeholder="Last Name"
@@ -46,6 +199,8 @@ const SignUp=()=>{
                                 inputContainerStyle={s.Input1}
                                 placeholderTextColor={Colors.white}
                                 inputStyle={{color:Colors.white}}
+                                onChangeText={(t)=>setL_name(t)}
+                                value={L_name}
                                 />
                         </View>
                         <Input
@@ -54,6 +209,9 @@ const SignUp=()=>{
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            keyboardType="email-address"
+                            onChangeText={(t)=>setemail(t)}
+                            value={email}
                             />
                         <Input
                             placeholder="Mobile"
@@ -61,6 +219,9 @@ const SignUp=()=>{
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            keyboardType="number-pad"
+                            onChangeText={(t)=>setm_number(t)}
+                            value={m_number}
                             />
                         <Input
                             placeholder="Business Name"
@@ -68,6 +229,9 @@ const SignUp=()=>{
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            keyboardType="default"
+                            onChangeText={(t)=>setb_name(t)}
+                            value={b_name}
                             />
                         <Input
                             placeholder="Business Location"
@@ -75,41 +239,118 @@ const SignUp=()=>{
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            onChangeText={(t)=>setb_location(t)}
+                            value={b_location}
                             />
-                        <Input
+                        {/* <Input
                             placeholder="Choose City"
                             containerStyle={s.Input}
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
-                            />
-                        <Input
+                            onChangeText={(t)=>setcity(t)}
+                            value={city}
+                            /> */}
+                            <Picker
+                                selectedValue={city}
+                                style={[{color:"#fff",fontSize:30},s.Input11]}
+                                itemStyle={{fontFamily:FontFamily.bold}}
+                                dropdownIconColor="#fff"
+                                mode="dialog"
+                                onValueChange={(itemValue, itemIndex) =>
+                                    setcity(itemValue)
+                                }>
+                                    <Picker.Item label="Choose City" value="" />
+                                {
+                                    cityArr.length === 0 ? null : cityArr.map((val,ind)=>{
+                                        return <Picker.Item key={ind} label={val.city[0]} value={val.city[0]} />
+                                    })
+                                }
+                            </Picker>
+                            <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
+                        {/* <Input
                             placeholder="Birthday"
                             containerStyle={s.Input}
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            onChangeText={(t)=>setdob(t)}
+                            value={dob}
+                            /> */}
+                            <DatePicker
+                                style={{width:"95%",alignSelf:"center",height:60,color:"#fff"}}
+                                date={dob}
+                                mode="date"
+                                placeholder="Date of Birth"
+                                format="DD-MM-YYYY"
+                                // minDate="2016-05-01"
+                                // maxDate="2016-06-01"
+                                confirmBtnText="Confirm"
+                                cancelBtnText="Cancel"
+                                customStyles={{
+                                    dateIcon: {
+                                        alignItems: 'flex-end',
+                                    },
+                                    dateInput: {
+                                        borderColor: '#234456',
+                                        borderWidth: 0,
+                                        // borderRadius: 4,
+                                        alignItems: 'flex-start',
+                                        paddingRight: 10,
+                                        borderBottomColor:"#fff",
+                                        borderBottomWidth:1
+                                    },
+                                    dateText: {
+                                        color:"#fff",
+                                        fontFamily:FontFamily.semi_bold,
+                                        // fontSize:30
+                                    }
+                                }}
+                                onDateChange={(date) => setdob(date)}
                             />
-                        <Input
+                        {/* <Input
                             placeholder="Gender"
                             containerStyle={s.Input}
                             inputContainerStyle={[s.Input]}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
-                            />
+                            onChangeText={(t)=>setgender(t)}
+                            value={gender}
+                            /> */}
+                            <Picker
+                                selectedValue={gender}
+                                style={[{color:"#fff",marginTop:-20,borderBottomColor:Colors.white,
+                                borderBottomWidth:1,}]}
+                                itemStyle={{fontFamily:FontFamily.default}}
+                                dropdownIconColor="#fff"
+                                mode="dialog"
+                                onValueChange={(itemValue, itemIndex) =>
+                                    setgender(itemValue)
+                                }>
+                                    <Picker.Item label="Gender" value="" />
+                                    <Picker.Item label="Male" value="male" />
+                                    <Picker.Item label="Female" value="female" />
+                            </Picker>
+                            <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
                         <Input
                             placeholder="Password"
+                            secureTextEntry
                             containerStyle={s.Input}
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            onChangeText={(t)=>setpassword(t)}
+                            value={password}
                             />
                         <Input
                             placeholder="Confirm Password"
                             containerStyle={s.Input}
+                            secureTextEntry
                             inputContainerStyle={s.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            onChangeText={(t)=>setconfirmPass(t)}
+                            value={confirmPass}
                             />
                     </View>
                     <View>
@@ -118,7 +359,7 @@ const SignUp=()=>{
                         </Text>
                     </View>
                     <View style={{elevation:5}}>
-                        <TouchableOpacity style={s.btn1} onPress={()=>Navigation.navigate("AddBoat")}>
+                        <TouchableOpacity style={s.btn1} onPress={()=>{signUp()}}>
                             <Text style={s.btn1Text}>Sign Up</Text>
                         </TouchableOpacity>
                     </View>
@@ -140,6 +381,48 @@ const SignUp=()=>{
                     </View>
                  </ScrollView>
              </ImageBackground>
+             <Overlay visible={visible}>
+             <View style={{width:"90%",alignSelf:"center"}}>
+                 <Text style={{textAlign:"center",marginVertical:10,fontFamily:FontFamily.semi_bold}}>Verify Otp</Text>
+                 <Text style={{textAlign:"center",marginBottom:10,fontFamily:FontFamily.default}}>Otp is sent to {email}</Text>
+                 <OtpInputs
+                    handleChange={(code) => setOtp(code)}
+                    numberOfInputs={6}
+                    style={{justifyContent:"space-between",flexDirection:"row",width:"100%",alignSelf:"center",}}
+                    inputStyles={{
+                        color:Colors.orange,
+                        textAlign:"center",
+                        fontFamily:FontFamily.semi_bold,
+                        fontSize:20,
+                    }}
+                    inputContainerStyles={{
+                        backgroundColor:Colors.gray1,
+                        borderColor:"#000",
+                        height:50,
+                        width:50,
+                        borderRadius:10,
+                        borderWidth:0,
+                        elevation:5,
+                        justifyContent:"space-around"
+                    }}
+                    focusStyles={{
+                        borderWidth:1,
+                        borderColor:Colors.orange,
+                        backgroundColor:Colors.white,
+                        elevation:5
+                    }}
+                />
+                <View style={{flexDirection:"row",marginTop:30,alignSelf:"center"}}>
+                    <Text style={{textAlign:"center",fontFamily:FontFamily.default}}> Didn't recived code ? </Text>
+                    <TouchableOpacity style={{}} onPress={()=>resendOtp({user_id:userId})}><Text style={{alignSelf:"center",fontFamily:FontFamily.semi_bold}}>Resend Code</Text></TouchableOpacity>
+                </View>
+                <View style={{elevation:5,marginBottom:10}}>
+                    <TouchableOpacity style={s.btn1} onPress={()=>{toggleOverlay()}}>
+                        <Text style={s.btn1Text}>Verify & Sign Up</Text>
+                    </TouchableOpacity>
+                </View>
+                </View>
+             </Overlay>
         </View>
     )
 }
@@ -176,6 +459,13 @@ const s = StyleSheet.create({
     Input:{
         borderBottomColor:Colors.white,
         marginTop:-15
+    },
+    Input11:{
+        borderBottomColor:Colors.white,
+        borderBottomWidth:1,
+        marginTop:-25,
+        // marginBottom:20,
+        borderColor:"#fff"
     },
     btn1:{
         height:48,
