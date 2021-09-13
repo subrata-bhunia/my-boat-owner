@@ -5,7 +5,9 @@ import {
     StyleSheet,
     ImageBackground,
     TouchableOpacity,
-    ScrollView
+    ScrollView,
+    ToastAndroid,
+    ActivityIndicator
 } from 'react-native';
 import { 
     Icon,
@@ -40,7 +42,8 @@ player_id
 */
 const SignUp=()=>{
     const Navigation = useNavigation();
-    const [cityArr,serCityArr]=useState([])
+    const [cityArr,serCityArr]=useState([]);
+    const [loader,setloader]=useState(false);
     // -------------------------------------------- //
     const [f_name,setF_name]=useState("");
     const [L_name,setL_name]=useState("");
@@ -63,6 +66,7 @@ const SignUp=()=>{
     };
     // ----------- //
     const [AllData,setAllData]=useState(null);
+    const [AllDataRe,setAllDataRe]=useState(null);
     // 
     var raw= {
         f_name:f_name,
@@ -84,13 +88,16 @@ const SignUp=()=>{
     // console.log(signup_data);
 
     // -----------------------Api Urls--------------------- //
-    var url='https://myboatonline.com/app/webservice';
+    var url_main='https://myboatonline.com/app/webservice';
+    var url=config.apiUrl
+    console.log(url)
     const apiUrl_signup = url+"/signup.php";
-    const cityUrl = config.apiUrl+"/city_list.php?country_code=965"
-    const mailSendUrl =config.apiUrl+"/mailFunctionsSend.php";
-    const resendOtpUrl= config.apiUrl+"/resend_otp.php";
+    const cityUrl = url+"/city_list.php?country_code=965"
+    const mailSendUrl =url+"/mailFunctionsSend.php";
+    const resendOtpUrl= url+"/resend_otp.php";
+    const verifyOtpUrl= url+"/otp_verify.php";
     // ----------All Citys ----------- //
-    const ApiTest=()=>{
+    const all_city_call=()=>{
         axios.get(cityUrl)
         .then((res)=>serCityArr(res.data.city_arr))
         .catch((err)=>console.log(err))
@@ -125,19 +132,27 @@ const SignUp=()=>{
     }
     // ----------- Mail sent ---------- //
     var email_array=AllData === null ? null : AllData.email_arr ;
+    var user_details = AllData === null ? null : AllData.user_details ;
     // console.log("email_array===>",email_array.length)
     useEffect(()=>{
        
         if (AllData !== null){
             if (AllData.success === 'true'){
-                setUserId(AllData.user_id)
-                mailSend()
-                
+                setUserId(user_details.user_id)
+                mailSend({email_array:email_array})
             }
         }
     },[AllData])
+
+    useEffect(()=>{
+        if (AllDataRe !==null){
+            if(AllDataRe.success === "true"){
+                mailSend({email_array:AllDataRe.email_arr})
+            }
+        }
+    },[AllDataRe])
     console.log(userId)
-    const mailSend=()=>{
+    const mailSend=({email_array})=>{
         var email = email_array[0].email;
         var mailcontent = email_array[0].mailcontent
         var mailsubject = email_array[0].mailsubject
@@ -158,228 +173,241 @@ const SignUp=()=>{
         var resend_otp_data = new FormData();
         resend_otp_data.append("user_id_post",user_id);
         axios.post(resendOtpUrl,resend_otp_data)
-        .then((res)=>console.log(res))
+        .then((res)=>{setAllDataRe(res.data),setOtp(AllDataRe ? res.data.user_details.otp : null)})
         .catch((err)=>console.log(err))
     }
-    //
+// ------------------------------Verify Otp----- //
+console.log("OTP",AllDataRe ? AllDataRe.user_details.otp : null)
+console.log("OTP",user_details ? user_details.otp : null)
+/**
+ * New Parameters = user_id_post, user_otp, user_type (0=admin, 1=user, 2=Client), device_type (browser, Android, IOS), player_id
+ */
+    const verifyOtp = ({user_id,user_otp})=>{
+        console.log(parseInt(user_otp))
+        var verify_otp_data = new FormData();
+        verify_otp_data.append("user_id_post",user_id);
+        verify_otp_data.append("user_type",config.user_type_post);
+        verify_otp_data.append("device_type",config.device_type);
+        verify_otp_data.append("player_id",config.player_id);
+        verify_otp_data.append("user_otp",parseInt(user_otp));
+        axios.post(verifyOtpUrl,verify_otp_data)
+        .then((res)=>{res.data.success === "true" ? (ToastAndroid.show(res.data.msg[0],ToastAndroid.SHORT,ToastAndroid.BOTTOM),setVisible(false),gotoAddBoatPage()):ToastAndroid.show(res.data.msg[0],ToastAndroid.SHORT,ToastAndroid.BOTTOM)})
+        .catch((err)=>console.log(err))
+    }
+    //-----------//
     useEffect(()=>{
-        ApiTest()
+        all_city_call()
     },[])
-    
-    // console.log(AllData);
-    // cityArr.map((val,ind)=>console.log(val.city[0]))
+    // --------Navigation --------- //
+    const gotoAddBoatPage=()=>{
+        setloader(true);
+        setTimeout(() => {
+            setloader(false);
+            Navigation.navigate("AddBoat")
+        }, 3000);
+    }
     return(
-        <View>
+        <View style={{flex:1}}>
             <ImageBackground
              style={s.ImageBackground}
              source={back_img}
              imageStyle={s.ImageBackground_Img}
              >
-                 <ScrollView>
-                    <View style={s.Logo}>
-                        <Text style={{fontFamily:FontFamily.semi_bold,textTransform:"uppercase",color:Colors.white}}>
-                            Logo
-                        </Text>
-                    </View>
-                    <Text style={s.Text1}>Boat Owner</Text>
-                    <View>
-                        <View style={{flexDirection:"row",justifyContent:"space-around",width:"98%",alignSelf:"center"}}>
+                 {
+                     loader ? (
+                     <ActivityIndicator
+                        animating={loader}
+                        color = {Colors.white}
+                        size = {50}
+                        style={{
+                            flex: 1,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            height:70
+                        }}
+                        />
+                     ) : (
+                        <ScrollView>
+                        <View style={s.Logo}>
+                            <Text style={{fontFamily:FontFamily.semi_bold,textTransform:"uppercase",color:Colors.white}}>
+                                Logo
+                            </Text>
+                        </View>
+                        <Text style={s.Text1}>Boat Owner</Text>
+                        <View>
+                            <View style={{flexDirection:"row",justifyContent:"space-around",width:"98%",alignSelf:"center"}}>
+                                <Input
+                                    placeholder="First Name"
+                                    containerStyle={s.Input1}
+                                    inputContainerStyle={s.Input1}
+                                    placeholderTextColor={Colors.white}
+                                    inputStyle={{color:Colors.white}}
+                                    onChangeText={(t)=>setF_name(t)}
+                                    value={f_name}
+                                    />
+                                <Input
+                                    placeholder="Last Name"
+                                    containerStyle={s.Input1}
+                                    inputContainerStyle={s.Input1}
+                                    placeholderTextColor={Colors.white}
+                                    inputStyle={{color:Colors.white}}
+                                    onChangeText={(t)=>setL_name(t)}
+                                    value={L_name}
+                                    />
+                            </View>
                             <Input
-                                placeholder="First Name"
-                                containerStyle={s.Input1}
-                                inputContainerStyle={s.Input1}
+                                placeholder="Email"
+                                containerStyle={s.Input}
+                                inputContainerStyle={s.Input}
                                 placeholderTextColor={Colors.white}
                                 inputStyle={{color:Colors.white}}
-                                onChangeText={(t)=>setF_name(t)}
-                                value={f_name}
+                                keyboardType="email-address"
+                                onChangeText={(t)=>setemail(t)}
+                                value={email}
                                 />
                             <Input
-                                placeholder="Last Name"
-                                containerStyle={s.Input1}
-                                inputContainerStyle={s.Input1}
+                                placeholder="Mobile"
+                                containerStyle={s.Input}
+                                inputContainerStyle={s.Input}
                                 placeholderTextColor={Colors.white}
                                 inputStyle={{color:Colors.white}}
-                                onChangeText={(t)=>setL_name(t)}
-                                value={L_name}
+                                keyboardType="number-pad"
+                                onChangeText={(t)=>setm_number(t)}
+                                value={m_number}
+                                />
+                            <Input
+                                placeholder="Business Name"
+                                containerStyle={s.Input}
+                                inputContainerStyle={s.Input}
+                                placeholderTextColor={Colors.white}
+                                inputStyle={{color:Colors.white}}
+                                keyboardType="default"
+                                onChangeText={(t)=>setb_name(t)}
+                                value={b_name}
+                                />
+                            <Input
+                                placeholder="Business Location"
+                                containerStyle={s.Input}
+                                inputContainerStyle={s.Input}
+                                placeholderTextColor={Colors.white}
+                                inputStyle={{color:Colors.white}}
+                                onChangeText={(t)=>setb_location(t)}
+                                value={b_location}
+                                />
+                                <Picker
+                                    selectedValue={city}
+                                    style={[{color:"#fff",fontSize:30},s.Input11]}
+                                    itemStyle={{fontFamily:FontFamily.bold}}
+                                    dropdownIconColor="#fff"
+                                    mode="dialog"
+                                    onValueChange={(itemValue, itemIndex) =>
+                                        setcity(itemValue)
+                                    }>
+                                        <Picker.Item label="Choose City" value="" />
+                                    {
+                                        cityArr.length === 0 ? null : cityArr.map((val,ind)=>{
+                                            return <Picker.Item key={ind} label={val.city[0]} value={val.city[0]} />
+                                        })
+                                    }
+                                </Picker>
+                                <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
+                                <DatePicker
+                                    style={{width:"95%",alignSelf:"center",height:60,color:"#fff"}}
+                                    date={dob}
+                                    mode="date"
+                                    placeholder="Date of Birth"
+                                    format="YYYY-MM-DD"
+                                    // minDate="2016-05-01"
+                                    // maxDate="2016-06-01"
+                                    confirmBtnText="Confirm"
+                                    cancelBtnText="Cancel"
+                                    customStyles={{
+                                        dateIcon: {
+                                            alignItems: 'flex-end',
+                                        },
+                                        dateInput: {
+                                            borderColor: '#234456',
+                                            borderWidth: 0,
+                                            // borderRadius: 4,
+                                            alignItems: 'flex-start',
+                                            paddingRight: 10,
+                                            borderBottomColor:"#fff",
+                                            borderBottomWidth:1
+                                        },
+                                        dateText: {
+                                            color:"#fff",
+                                            fontFamily:FontFamily.semi_bold,
+                                            // fontSize:30
+                                        }
+                                    }}
+                                    onDateChange={(date) => setdob(date)}
+                                />
+                                <Picker
+                                    selectedValue={gender}
+                                    style={[{color:"#fff",marginTop:-20,borderBottomColor:Colors.white,
+                                    borderBottomWidth:1,}]}
+                                    itemStyle={{fontFamily:FontFamily.default}}
+                                    dropdownIconColor="#fff"
+                                    mode="dialog"
+                                    onValueChange={(itemValue, itemIndex) =>
+                                        setgender(itemValue)
+                                    }>
+                                        <Picker.Item label="Gender" value="" />
+                                        <Picker.Item label="Male" value="male" />
+                                        <Picker.Item label="Female" value="female" />
+                                </Picker>
+                                <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
+                            <Input
+                                placeholder="Password"
+                                secureTextEntry
+                                containerStyle={s.Input}
+                                inputContainerStyle={s.Input}
+                                placeholderTextColor={Colors.white}
+                                inputStyle={{color:Colors.white}}
+                                onChangeText={(t)=>setpassword(t)}
+                                value={password}
+                                />
+                            <Input
+                                placeholder="Confirm Password"
+                                containerStyle={s.Input}
+                                secureTextEntry
+                                inputContainerStyle={s.Input}
+                                placeholderTextColor={Colors.white}
+                                inputStyle={{color:Colors.white}}
+                                onChangeText={(t)=>setconfirmPass(t)}
+                                value={confirmPass}
                                 />
                         </View>
-                        <Input
-                            placeholder="Email"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            keyboardType="email-address"
-                            onChangeText={(t)=>setemail(t)}
-                            value={email}
-                            />
-                        <Input
-                            placeholder="Mobile"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            keyboardType="number-pad"
-                            onChangeText={(t)=>setm_number(t)}
-                            value={m_number}
-                            />
-                        <Input
-                            placeholder="Business Name"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            keyboardType="default"
-                            onChangeText={(t)=>setb_name(t)}
-                            value={b_name}
-                            />
-                        <Input
-                            placeholder="Business Location"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setb_location(t)}
-                            value={b_location}
-                            />
-                        {/* <Input
-                            placeholder="Choose City"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setcity(t)}
-                            value={city}
-                            /> */}
-                            <Picker
-                                selectedValue={city}
-                                style={[{color:"#fff",fontSize:30},s.Input11]}
-                                itemStyle={{fontFamily:FontFamily.bold}}
-                                dropdownIconColor="#fff"
-                                mode="dialog"
-                                onValueChange={(itemValue, itemIndex) =>
-                                    setcity(itemValue)
-                                }>
-                                    <Picker.Item label="Choose City" value="" />
-                                {
-                                    cityArr.length === 0 ? null : cityArr.map((val,ind)=>{
-                                        return <Picker.Item key={ind} label={val.city[0]} value={val.city[0]} />
-                                    })
-                                }
-                            </Picker>
-                            <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
-                        {/* <Input
-                            placeholder="Birthday"
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setdob(t)}
-                            value={dob}
-                            /> */}
-                            <DatePicker
-                                style={{width:"95%",alignSelf:"center",height:60,color:"#fff"}}
-                                date={dob}
-                                mode="date"
-                                placeholder="Date of Birth"
-                                format="DD-MM-YYYY"
-                                // minDate="2016-05-01"
-                                // maxDate="2016-06-01"
-                                confirmBtnText="Confirm"
-                                cancelBtnText="Cancel"
-                                customStyles={{
-                                    dateIcon: {
-                                        alignItems: 'flex-end',
-                                    },
-                                    dateInput: {
-                                        borderColor: '#234456',
-                                        borderWidth: 0,
-                                        // borderRadius: 4,
-                                        alignItems: 'flex-start',
-                                        paddingRight: 10,
-                                        borderBottomColor:"#fff",
-                                        borderBottomWidth:1
-                                    },
-                                    dateText: {
-                                        color:"#fff",
-                                        fontFamily:FontFamily.semi_bold,
-                                        // fontSize:30
-                                    }
-                                }}
-                                onDateChange={(date) => setdob(date)}
-                            />
-                        {/* <Input
-                            placeholder="Gender"
-                            containerStyle={s.Input}
-                            inputContainerStyle={[s.Input]}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setgender(t)}
-                            value={gender}
-                            /> */}
-                            <Picker
-                                selectedValue={gender}
-                                style={[{color:"#fff",marginTop:-20,borderBottomColor:Colors.white,
-                                borderBottomWidth:1,}]}
-                                itemStyle={{fontFamily:FontFamily.default}}
-                                dropdownIconColor="#fff"
-                                mode="dialog"
-                                onValueChange={(itemValue, itemIndex) =>
-                                    setgender(itemValue)
-                                }>
-                                    <Picker.Item label="Gender" value="" />
-                                    <Picker.Item label="Male" value="male" />
-                                    <Picker.Item label="Female" value="female" />
-                            </Picker>
-                            <View style={{borderColor:"#fff",borderBottomWidth:1,width:"95%",alignSelf:"center",marginBottom:23,marginTop:-7}} />
-                        <Input
-                            placeholder="Password"
-                            secureTextEntry
-                            containerStyle={s.Input}
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setpassword(t)}
-                            value={password}
-                            />
-                        <Input
-                            placeholder="Confirm Password"
-                            containerStyle={s.Input}
-                            secureTextEntry
-                            inputContainerStyle={s.Input}
-                            placeholderTextColor={Colors.white}
-                            inputStyle={{color:Colors.white}}
-                            onChangeText={(t)=>setconfirmPass(t)}
-                            value={confirmPass}
-                            />
-                    </View>
-                    <View>
-                        <Text style={s.Text1}>
-                            By sign up, you agree to our terms of service and privacy policy.
-                        </Text>
-                    </View>
-                    <View style={{elevation:5}}>
-                        <TouchableOpacity style={s.btn1} onPress={()=>{signUp()}}>
-                            <Text style={s.btn1Text}>Sign Up</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View>
-                        <Text style={[s.Text1,{marginBottom:10}]}>
-                            I have already account ?{" "}
-                            <Text style={{
-                                fontFamily:FontFamily.semi_bold,
-                                color:Colors.white,
-                                alignSelf:"center",
-                                textDecorationLine:"underline"
-                            }}
-                                suppressHighlighting={true}
-                                onPress={()=>Navigation.navigate("Login")}
-                                >
-                                 Login
+                        <View>
+                            <Text style={s.Text1}>
+                                By sign up, you agree to our terms of service and privacy policy.
                             </Text>
-                        </Text>
-                    </View>
-                 </ScrollView>
+                        </View>
+                        <View style={{elevation:5}}>
+                            <TouchableOpacity style={s.btn1} onPress={()=>{signUp()}}>
+                                <Text style={s.btn1Text}>Sign Up</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View>
+                            <Text style={[s.Text1,{marginBottom:10}]}>
+                                I have already account ?{" "}
+                                <Text style={{
+                                    fontFamily:FontFamily.semi_bold,
+                                    color:Colors.white,
+                                    alignSelf:"center",
+                                    textDecorationLine:"underline"
+                                }}
+                                    suppressHighlighting={true}
+                                    onPress={()=>Navigation.navigate("Login")}
+                                    >
+                                     Login
+                                </Text>
+                            </Text>
+                        </View>
+                     </ScrollView>
+                     )
+                 }
+                 
              </ImageBackground>
              <Overlay visible={visible}>
              <View style={{width:"90%",alignSelf:"center"}}>
@@ -388,7 +416,8 @@ const SignUp=()=>{
                  <OtpInputs
                     handleChange={(code) => setOtp(code)}
                     numberOfInputs={6}
-                    style={{justifyContent:"space-between",flexDirection:"row",width:"100%",alignSelf:"center",}}
+                    value={parseInt(otp)}
+                    style={{justifyContent:"space-between",flexDirection:"row",width:"100%",alignSelf:"center",fontFamily:FontFamily.semi_bold,}}
                     inputStyles={{
                         color:Colors.orange,
                         textAlign:"center",
@@ -406,18 +435,19 @@ const SignUp=()=>{
                         justifyContent:"space-around"
                     }}
                     focusStyles={{
-                        borderWidth:1,
+                        // borderWidth:1,
                         borderColor:Colors.orange,
                         backgroundColor:Colors.white,
                         elevation:5
                     }}
+                    
                 />
                 <View style={{flexDirection:"row",marginTop:30,alignSelf:"center"}}>
                     <Text style={{textAlign:"center",fontFamily:FontFamily.default}}> Didn't recived code ? </Text>
                     <TouchableOpacity style={{}} onPress={()=>resendOtp({user_id:userId})}><Text style={{alignSelf:"center",fontFamily:FontFamily.semi_bold}}>Resend Code</Text></TouchableOpacity>
                 </View>
                 <View style={{elevation:5,marginBottom:10}}>
-                    <TouchableOpacity style={s.btn1} onPress={()=>{toggleOverlay()}}>
+                    <TouchableOpacity style={s.btn1} onPress={()=>{verifyOtp({user_id:userId,user_otp:otp})}}>
                         <Text style={s.btn1Text}>Verify & Sign Up</Text>
                     </TouchableOpacity>
                 </View>

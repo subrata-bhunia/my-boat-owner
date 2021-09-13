@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
     Text,
     View,
@@ -12,6 +12,8 @@ import {
 } from 'react-native-elements';
 import { back_img, Colors, FontFamily, Sizes } from '../../Constants/Constants';
 import { useNavigation } from '@react-navigation/core';
+import config from '../../Constants/config';
+import axios from 'axios'; 
 
 const WelComeNote=()=>{
     return(
@@ -29,6 +31,34 @@ const WelComeNote=()=>{
 
 const Login=()=>{
     const nav=useNavigation();
+    const [email,setemail]=useState("");
+    const [password,setpassword] =useState("");
+// ------------------------------------------ //
+    let url = config.apiUrl + "/login.php";
+            var data = new FormData();
+            data.append('email', email)
+            data.append('password', password)
+            data.append("device_type", config.device_type)
+            data.append("player_id", config.player_id)
+            data.append("user_login_type",config.login_type)
+            data.append("action_type", 'normal_login')
+            data.append("language_id", config.language_id)
+            data.append("country_code", config.country_code)
+            data.append("user_type", config.user_type_post)
+    const logIn=()=>{
+        axios.post(url,data)
+        .then(res=>{
+            if(res.data.success == "true"){
+                nav.navigate("Home");
+            }else{
+                alert(res.data.msg[0])
+                console.log(res.data.success)
+            }
+        })
+        .catch(err=>console.log(err))
+    }
+    // --------------------------------------- //
+
     return(
         <View style={{flex:1}}>
             <ImageBackground
@@ -48,6 +78,8 @@ const Login=()=>{
                             inputContainerStyle={styles.Input}
                             placeholderTextColor={Colors.white}
                             inputStyle={{color:Colors.white}}
+                            keyboardType="email-address"
+                            onChangeText={txt=>setemail(txt)}
                             />
                          <View style={{flexDirection:"row",alignItems:"center"}}>
                             <Input
@@ -56,6 +88,9 @@ const Login=()=>{
                                 inputContainerStyle={styles.Input}
                                 placeholderTextColor={Colors.white}
                                 inputStyle={{color:Colors.white}}
+                                secureTextEntry
+                                selectTextOnFocus
+                                onChangeText={pass=>setpassword(pass)}
                                 />
                             <TouchableOpacity style={{marginLeft:-100,marginTop:-13}}>
                                 <Text style={styles.FGPASS}>
@@ -66,7 +101,7 @@ const Login=()=>{
                      </View>
                      <View>
                         <View style={{alignItems:"center"}}>
-                             <TouchableOpacity style={styles.Btn1} onPress={()=>nav.navigate("Home")}>
+                             <TouchableOpacity style={styles.Btn1} onPress={()=>logIn()}>
                                  <Text style={styles.Btn1Text}>
                                      Login
                                  </Text>

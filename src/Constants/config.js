@@ -26,6 +26,6 @@ export default {
     login_type:0,       //login_type (0 for App, 1 for Facebook, 2 for Google, 3 for twitter, 4 for Instagram, 5 for apple)
     player_id:123456,
     language_id:0,
-    country_code:"+965",
+    country_code:965,
     user_type_post:2
 }
